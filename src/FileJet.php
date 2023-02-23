@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FileJet;
 
+use Aws\Lambda\LambdaClient;
 use FileJet\Messages\DownloadInstruction;
 use FileJet\Messages\UploadInstruction;
 use FileJet\Messages\UploadInstructionFactory;
@@ -17,17 +18,20 @@ final class FileJet
     private $config;
     /** @var Mutation */
     private $mutation;
+    /** @var LambdaClient */
+    private $lambdaClient;
 
-    public function __construct(HttpClient $httpClient, Config $config, Mutation $mutation)
+    public function __construct(HttpClient $httpClient, Config $config, Mutation $mutation, LambdaClient $lambdaClient)
     {
         $this->httpClient = $httpClient;
         $this->config = $config;
         $this->mutation = $mutation;
+        $this->lambdaClient = $lambdaClient;
     }
 
     public function getUrl(FileInterface $file): string
     {
-        $url = "{$this->config->getPublicUrl()}/{$this->normalizeId($file->getIdentifier())}";
+        $url = "{$this->config->getPublicUrl()}/{$this->ensureValidId($file->getIdentifier())}";
 
         if ($this->config->isAutoMode() && $this->mutation->autoIsEnabled($file->getMutation())) {
             $file = new File($file->getIdentifier(), $this->mutation->toAutoMutation($file->getMutation()));
@@ -63,12 +67,7 @@ final class FileJet
      */
     private function getRequestParameters(string $fileId, int $expires, string $mutation = ''): array
     {
-        $requestParameters = ['fileId' => $this->normalizeId($fileId), 'expires' => $expires];
-
-        $customDomain = $this->config->getCustomDomain();
-        if ($customDomain) {
-            $requestParameters['customDomain'] = $customDomain;
-        }
+        $requestParameters = ['fileId' => $this->ensureValidId($fileId), 'ttl' => $expires];
 
         $mutation = $this->resolveAutoMutation($mutation);
         if ($mutation) {
@@ -90,9 +89,9 @@ final class FileJet
     public function uploadFile(UploadRequest $request): UploadInstruction
     {
         return UploadInstructionFactory::createFromResponse(
-            $this->request('file.requestUpload', [
+            $this->request('file.upload', [
                 'contentType' => $request->getContentType(),
-                'expires' => $request->getExpires(),
+                'ttl' => $request->getExpires(),
                 'access' => $request->getAccess(),
                 'filename' => $request->getFilename(),
             ])
@@ -109,14 +108,21 @@ final class FileJet
         $body = [];
         foreach ($requests as $request) {
             $body[] = [
+                '$command' => 'file.upload',
                 'contentType' => $request->getContentType(),
-                'expires' => $request->getExpires(),
+                'ttl' => $request->getExpires(),
                 'access' => $request->getAccess(),
                 'filename' => $request->getFilename(),
             ];
         }
 
-        $decodedBulkResponse = json_decode($this->request('file.requestUpload', $body)->getBody()->getContents(), true);
+        $decodedBulkResponse = json_decode(
+            (string)$this->lambdaClient->invoke([
+                'FunctionName' => $this->config->getLambdaControllerFunctionName(),
+                'Payload' => json_encode($body),
+            ])->get('Payload'), 
+            true
+        );
         $uploadInstructions = [];
         /** @var string[][] $instructionData */
         foreach ($decodedBulkResponse as $instructionData) {
@@ -128,25 +134,22 @@ final class FileJet
 
     public function deleteFile(string $fileId): void
     {
-        $this->request('file.delete', ['fileId' => $this->normalizeId($fileId)]);
+        $this->request('file.delete', ['fileId' => $this->ensureValidId($fileId)]);
     }
 
     private function request(string $operation, array $body)
     {
-        return $this->httpClient->sendRequest(
-            HttpClient::METHOD_POST,
-            "{$this->config->getStorageManagerUrl()}/$operation",
-            [
-                'Authorization' => $this->config->getApiKey(),
-                'Content-Type' => 'application/json',
-            ],
-            json_encode($body)
-        );
+        return (string)$this->lambdaClient->invoke([
+            'FunctionName' => $this->config->getLambdaControllerFunctionName(),
+            'Payload' => json_encode([
+                array_merge($body, ['$command' => $operation])
+            ]),
+        ])->get('Payload');
     }
 
-    private function normalizeId(string $fileId): string
+    private function ensureValidId(string $fileId): string
     {
-        return preg_replace('/[^a-z0-9]/', 'x', strtolower($fileId));
+        return preg_replace('/[^A-Za-z0-9_-]/', 'x', $fileId);
     }
 
     private function sign(string $url): string

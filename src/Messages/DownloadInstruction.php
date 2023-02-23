@@ -11,10 +11,10 @@ final class DownloadInstruction
     /** @var string */
     private $url;
 
-    public function __construct(ResponseInterface $response)
+    public function __construct(string $response)
     {
-        $data = json_decode($response->getBody()->getContents(), true);
-        $this->url = $data['url'];
+        $data = json_decode($response, true);
+        $this->url = $data[0]['url'];
     }
 
     public function getUrl(): string

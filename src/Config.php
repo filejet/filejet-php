@@ -7,9 +7,7 @@ namespace FileJet;
 class Config
 {
     /** @var string */
-    private $apiKey;
-    /** @var string */
-    private $storageId;
+    private $lambdaControllerFunctionName;
     /** @var string */
     private $baseUrl;
     /** @var string */
@@ -20,24 +18,22 @@ class Config
     private $customDomain;
 
     public function __construct(
-        string $apiKey,
-        string $storageId,
+        string $lambdaControllerFunctionName,
+        string $customDomain,
         string $signatureSecret = null,
         bool $autoMode = true,
-        string $baseUrl = null,
-        string $customDomain = null
+        string $baseUrl = null
     ) {
-        $this->apiKey = $apiKey;
-        $this->storageId = $storageId;
+        $this->lambdaFunctionName = $lambdaControllerFunctionName;
         $this->signatureSecret = $signatureSecret;
         $this->autoMode = $autoMode;
         $this->baseUrl = $baseUrl;
         $this->customDomain = $customDomain;
     }
 
-    public function getApiKey(): string
+    public function getLambdaControllerFunctionName(): string
     {
-        return $this->apiKey;
+        return $this->lambdaFunctionName;
     }
 
     public function getBaseUrl(): ?string
@@ -55,16 +51,9 @@ class Config
         return $this->autoMode;
     }
 
-    public function getStorageManagerUrl(): string
-    {
-        return "https://api.filejet.io/{$this->storageId}";
-    }
-
     public function getPublicUrl(): string
     {
-        if ($this->customDomain) return "https://{$this->customDomain}";
-
-        return "https://{$this->storageId}.5gcdn.net";
+        return "https://{$this->getCustomDomain()}";
     }
 
     public function getCustomDomain(): ?string

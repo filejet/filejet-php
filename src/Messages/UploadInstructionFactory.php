@@ -13,7 +13,7 @@ class UploadInstructionFactory
      */
     public static function createFromArray(array $data): UploadInstruction
     {
-        $identifier = $data['id'];
+        $identifier = $data['fileId'];
 
         $uploadFormatData = $data['uploadFormat'];
         $uploadFormat = new UploadFormat(
@@ -25,10 +25,10 @@ class UploadInstructionFactory
         return new UploadInstruction($identifier, $uploadFormat);
     }
 
-    public static function createFromResponse(ResponseInterface $response): UploadInstruction
+    public static function createFromResponse(string $response): UploadInstruction
     {
-        $data = json_decode($response->getBody()->getContents(), true);
+        $data = json_decode($response, true);
 
-        return static::createFromArray($data);
+        return static::createFromArray($data[0]);
     }
 }
