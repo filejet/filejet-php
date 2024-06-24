@@ -51,11 +51,64 @@ final class FileJet
         );
     }
 
+    /**
+     * @param string[] $fileIdentifiers
+     * @return DownloadInstruction[]
+     */
+    public function bulkPrivateUrl(array $fileIdentifiers, int $expires, string $mutation = ''): array
+    {
+        if (!$fileIdentifiers) {
+            return [];
+        }
+
+        $orderedIdentifiers = array_values($fileIdentifiers);
+        $body = [];
+        foreach ($fileIdentifiers as $identifier) {
+            $body[] = $this->getRequestParameters($identifier, $expires, $mutation);
+        }
+
+        $decodedBulkResponse = json_decode($this->request('file.privateUrl', $body)->getBody()->getContents(), true);
+        $downloadInstructions = [];
+        /** @var string[][] $instructionData */
+        foreach ($decodedBulkResponse as $key => $instructionData) {
+            $downloadInstructions[$orderedIdentifiers[$key]] = new DownloadInstruction($instructionData['url']);
+        }
+
+        return $downloadInstructions;
+    }
+
     public function getDetentionUrl(string $fileId, int $expires, string $mutation = ''): DownloadInstruction
     {
         return new DownloadInstruction(
             $this->request('file.detentionUrl', $this->getRequestParameters($fileId, $expires, $mutation))
         );
+    }
+
+    /**
+     * @param string[] $fileIdentifiers
+     * @return DownloadInstruction[]
+     */
+    public function bulkDetentionUrl(array $fileIdentifiers, int $expires, string $mutation = ''): array
+    {
+        if (!$fileIdentifiers) {
+            return [];
+        }
+
+        $orderedIdentifiers = array_values($fileIdentifiers);
+        $body = [];
+        foreach ($fileIdentifiers as $identifier) {
+            $body[] = $this->getRequestParameters($identifier, $expires, $mutation);
+        }
+
+        $decodedBulkResponse = \json_decode($this->request('file.detentionUrl', $body)->getBody()->getContents(), true);
+        $downloadInstructions = [];
+
+        /** @var string[][] $instructionData */
+        foreach ($decodedBulkResponse as $key => $instructionData) {
+            $downloadInstructions[$orderedIdentifiers[$key]] = new DownloadInstruction($instructionData['url']);
+        }
+
+        return $downloadInstructions;
     }
 
     /**

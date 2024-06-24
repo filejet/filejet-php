@@ -11,8 +11,17 @@ final class DownloadInstruction
     /** @var string */
     private $url;
 
-    public function __construct(ResponseInterface $response)
+    /**
+     * @param ResponseInterface|string $response
+     */
+    public function __construct($response)
     {
+        if (is_string($response)) {
+            $this->url = $response;
+
+            return;
+        }
+
         $data = json_decode($response->getBody()->getContents(), true);
         $this->url = $data['url'];
     }
