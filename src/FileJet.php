@@ -55,11 +55,81 @@ final class FileJet
         );
     }
 
+    /**
+     * @param string[] $fileIdentifiers
+     * @return DownloadInstruction[]
+     */
+    public function bulkPrivateUrl(array $fileIdentifiers, int $expires, string $mutation = ''): array
+    {
+        if (!$fileIdentifiers) {
+            return [];
+        }
+
+        $orderedIdentifiers = array_values($fileIdentifiers);
+        $body = [];
+        foreach ($fileIdentifiers as $identifier) {
+            $params = $this->getRequestParameters($identifier, $expires, $mutation);
+            $params['$command'] = 'file.privateUrl';
+            $body[] = $params;
+        }
+
+        $decodedBulkResponse = json_decode(
+            (string)$this->lambdaClient->invoke([
+                'FunctionName' => $this->config->getLambdaControllerFunctionName(),
+                'Payload' => json_encode($body),
+            ])->get('Payload'),
+            true
+        );
+
+        $downloadInstructions = [];
+        /** @var string[][] $instructionData */
+        foreach ($decodedBulkResponse as $key => $instructionData) {
+            $downloadInstructions[$orderedIdentifiers[$key]] = new DownloadInstruction($instructionData['url']);
+        }
+
+        return $downloadInstructions;
+    }
+
     public function getDetentionUrl(string $fileId, int $expires, string $mutation = ''): DownloadInstruction
     {
         return new DownloadInstruction(
             $this->request('file.detentionUrl', $this->getRequestParameters($fileId, $expires, $mutation))
         );
+    }
+
+    /**
+     * @param string[] $fileIdentifiers
+     * @return DownloadInstruction[]
+     */
+    public function bulkDetentionUrl(array $fileIdentifiers, int $expires, string $mutation = ''): array
+    {
+        if (!$fileIdentifiers) {
+            return [];
+        }
+
+        $orderedIdentifiers = array_values($fileIdentifiers);
+        $body = [];
+        foreach ($fileIdentifiers as $identifier) {
+            $params = $this->getRequestParameters($identifier, $expires, $mutation);
+            $params['$command'] = 'file.detentionUrl';
+            $body[] = $params;
+        }
+
+        $decodedBulkResponse = json_decode(
+            (string)$this->lambdaClient->invoke([
+                'FunctionName' => $this->config->getLambdaControllerFunctionName(),
+                'Payload' => json_encode($body),
+            ])->get('Payload'),
+            true
+        );
+
+        $downloadInstructions = [];
+        /** @var string[][] $instructionData */
+        foreach ($decodedBulkResponse as $key => $instructionData) {
+            $downloadInstructions[$orderedIdentifiers[$key]] = new DownloadInstruction($instructionData['url']);
+        }
+
+        return $downloadInstructions;
     }
 
     /**
