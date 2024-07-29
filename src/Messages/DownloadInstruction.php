@@ -4,26 +4,19 @@ declare(strict_types=1);
 
 namespace FileJet\Messages;
 
-use Psr\Http\Message\ResponseInterface;
-
 final class DownloadInstruction
 {
     /** @var string */
     private $url;
 
-    /**
-     * @param ResponseInterface|string $response
-     */
-    public function __construct($response)
+    public function __construct(string $response)
     {
-        if (is_string($response)) {
+        try {
+            $data = json_decode($response, true);
+            $this->url = $data[0]['url'];
+        } catch (\Throwable $e) {
             $this->url = $response;
-
-            return;
         }
-
-        $data = json_decode($response->getBody()->getContents(), true);
-        $this->url = $data['url'];
     }
 
     public function getUrl(): string
