@@ -23,7 +23,13 @@ final class DownloadInstruction
         }
 
         $data = json_decode($response->getBody()->getContents(), true);
-        $this->url = $data['url'];
+        if (isset($data['url'])) {
+            $this->url = $data['url'];
+
+            return;
+        }
+
+        $this->url = '';
     }
 
     public function getUrl(): string
