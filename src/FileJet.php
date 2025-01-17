@@ -118,14 +118,6 @@ final class FileJet
                 continue;
             }
 
-            // try single file call
-            $downloadInstruction = $this->getUrlByType($urlType, $orderedIdentifiers[$key], $expires, $mutation);
-            if ($downloadInstruction->getUrl()) {
-                $downloadInstructions[$orderedIdentifiers[$key]] = $downloadInstruction->getUrl();
-
-                continue;
-            }
-
             // set empty string as a fallback to prevent errors down the line
             $downloadInstructions[$orderedIdentifiers[$key]] = new DownloadInstruction('');
         }
