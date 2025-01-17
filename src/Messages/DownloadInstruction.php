@@ -13,9 +13,17 @@ final class DownloadInstruction
     {
         try {
             $data = json_decode($response, true);
-            $this->url = $data[0]['url'];
-        } catch (\Throwable $e) {
+
+            if (isset($data[0]['url'])) {
+                $this->url = $data[0]['url'];
+
+                return;
+            }
+
             $this->url = $response;
+        } catch (\Throwable $e) {
+            //if $response contains invalid json
+            $this->url = '';
         }
     }
 

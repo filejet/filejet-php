@@ -50,9 +50,7 @@ final class FileJet
 
     public function getPrivateUrl(string $fileId, int $expires, string $mutation = ''): DownloadInstruction
     {
-        return new DownloadInstruction(
-            $this->request('file.privateUrl', $this->getRequestParameters($fileId, $expires, $mutation))
-        );
+        return $this->getUrlByType('privateUrl', $fileId, $expires, $mutation);
     }
 
     /**
@@ -61,40 +59,12 @@ final class FileJet
      */
     public function bulkPrivateUrl(array $fileIdentifiers, int $expires, string $mutation = ''): array
     {
-        if (!$fileIdentifiers) {
-            return [];
-        }
-
-        $orderedIdentifiers = array_values($fileIdentifiers);
-        $body = [];
-        foreach ($fileIdentifiers as $identifier) {
-            $params = $this->getRequestParameters($identifier, $expires, $mutation);
-            $params['$command'] = 'file.privateUrl';
-            $body[] = $params;
-        }
-
-        $decodedBulkResponse = json_decode(
-            (string)$this->lambdaClient->invoke([
-                'FunctionName' => $this->config->getLambdaControllerFunctionName(),
-                'Payload' => json_encode($body),
-            ])->get('Payload'),
-            true
-        );
-
-        $downloadInstructions = [];
-        /** @var string[][] $instructionData */
-        foreach ($decodedBulkResponse as $key => $instructionData) {
-            $downloadInstructions[$orderedIdentifiers[$key]] = new DownloadInstruction($instructionData['url']);
-        }
-
-        return $downloadInstructions;
+        return $this->bulkUrlByType('privateUrl', $fileIdentifiers, $expires, $mutation);
     }
 
     public function getDetentionUrl(string $fileId, int $expires, string $mutation = ''): DownloadInstruction
     {
-        return new DownloadInstruction(
-            $this->request('file.detentionUrl', $this->getRequestParameters($fileId, $expires, $mutation))
-        );
+        return $this->getUrlByType('detentionUrl', $fileId, $expires, $mutation);
     }
 
     /**
@@ -103,6 +73,22 @@ final class FileJet
      */
     public function bulkDetentionUrl(array $fileIdentifiers, int $expires, string $mutation = ''): array
     {
+        return $this->bulkUrlByType('detentionUrl', $fileIdentifiers, $expires, $mutation);
+    }
+
+    private function getUrlByType(string $urlType, string $fileId, int $expires, string $mutation = ''): DownloadInstruction
+    {
+        return new DownloadInstruction(
+            $this->request("file.$urlType", $this->getRequestParameters($fileId, $expires, $mutation))
+        );
+    }
+
+    /**
+     * @param string[] $fileIdentifiers
+     * @return DownloadInstruction[]
+     */
+    private function bulkUrlByType(string $urlType, array $fileIdentifiers, int $expires, string $mutation = ''): array
+    {
         if (!$fileIdentifiers) {
             return [];
         }
@@ -111,7 +97,7 @@ final class FileJet
         $body = [];
         foreach ($fileIdentifiers as $identifier) {
             $params = $this->getRequestParameters($identifier, $expires, $mutation);
-            $params['$command'] = 'file.detentionUrl';
+            $params['$command'] = "file.$urlType";
             $body[] = $params;
         }
 
@@ -124,9 +110,16 @@ final class FileJet
         );
 
         $downloadInstructions = [];
-        /** @var string[][] $instructionData */
+        /** @var string[] $instructionData */
         foreach ($decodedBulkResponse as $key => $instructionData) {
-            $downloadInstructions[$orderedIdentifiers[$key]] = new DownloadInstruction($instructionData['url']);
+            if (isset($instructionData['url'])) {
+                $downloadInstructions[$orderedIdentifiers[$key]] = new DownloadInstruction($instructionData['url']);
+
+                continue;
+            }
+
+            // set empty string as a fallback to prevent errors down the line
+            $downloadInstructions[$orderedIdentifiers[$key]] = new DownloadInstruction('');
         }
 
         return $downloadInstructions;
@@ -190,7 +183,7 @@ final class FileJet
             (string)$this->lambdaClient->invoke([
                 'FunctionName' => $this->config->getLambdaControllerFunctionName(),
                 'Payload' => json_encode($body),
-            ])->get('Payload'), 
+            ])->get('Payload'),
             true
         );
         $uploadInstructions = [];
