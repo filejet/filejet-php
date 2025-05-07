@@ -9,6 +9,10 @@ use FileJet\Messages\DownloadInstruction;
 use FileJet\Messages\UploadInstruction;
 use FileJet\Messages\UploadInstructionFactory;
 use FileJet\Messages\UploadRequest;
+use Aws\ResultInterface;
+use Aws\Exception\AwsException;
+use Aws\CommandPool;
+use Aws\CommandInterface;
 
 final class FileJet
 {
@@ -62,6 +66,15 @@ final class FileJet
         return $this->bulkUrlByType('privateUrl', $fileIdentifiers, $expires, $mutation);
     }
 
+    /**
+     * @param string[] $fileIdentifiers
+     * @return DownloadInstruction[]
+     */
+    public function bulkPrivateUrlAsync(array $fileIdentifiers, int $batchSize, int $expires, string $mutation = '', int $concurrency = 10): array
+    {
+        return $this->bulkUrlByTypeAsync('privateUrl', $fileIdentifiers, $batchSize, $concurrency, $expires, $mutation);
+    }
+
     public function getDetentionUrl(string $fileId, int $expires, string $mutation = ''): DownloadInstruction
     {
         return $this->getUrlByType('detentionUrl', $fileId, $expires, $mutation);
@@ -94,6 +107,7 @@ final class FileJet
         }
 
         $orderedIdentifiers = array_values($fileIdentifiers);
+
         $body = [];
         foreach ($fileIdentifiers as $identifier) {
             $params = $this->getRequestParameters($identifier, $expires, $mutation);
@@ -121,6 +135,57 @@ final class FileJet
             // set empty string as a fallback to prevent errors down the line
             $downloadInstructions[$orderedIdentifiers[$key]] = new DownloadInstruction('');
         }
+
+        return $downloadInstructions;
+    }
+
+    /**
+     * @param string[] $fileIdentifiers
+     * @throws AwsException
+     * @return DownloadInstruction[]
+     */
+    private function bulkUrlByTypeAsync(string $urlType, array $fileIdentifiers, int $batchSize, int $concurrency, int $expires, string $mutation = ''): array {
+        if (!$fileIdentifiers) {
+            return [];
+        }
+        $orderedIdentifiers = array_values($fileIdentifiers);
+        $commands = [];
+
+        foreach (\array_chunk($orderedIdentifiers, $batchSize, true) as $batchedIdentifiers) {
+            $body = [];
+            foreach ($batchedIdentifiers as $identifier) {
+                $params = $this->getRequestParameters($identifier, $expires, $mutation);
+                $params['$command'] = "file.$urlType";
+                $body[] = $params;
+            }
+
+            $commands[] = $this->lambdaClient->getCommand('Invoke', [
+                'FunctionName' => $this->config->getLambdaControllerFunctionName(),
+                'Payload' => json_encode($body),
+            ]);
+        }
+
+        $downloadInstructions = [];
+        $pool = new CommandPool($this->lambdaClient, $commands, [
+            'concurrency' => $concurrency,
+            'fulfilled' => function (ResultInterface $result, $index) use (&$downloadInstructions, $batchSize, $orderedIdentifiers) {
+                $decodedBulkResponse = json_decode(
+                    (string)$result->get('Payload'),
+                    true
+                );
+                foreach ($decodedBulkResponse as $key => $instructionData) {
+                    $key = $batchSize * $index + $key;
+                    if (isset($instructionData['url'])) {
+                        $downloadInstructions[$orderedIdentifiers[$key]] = new DownloadInstruction($instructionData['url']);
+                    }
+                }
+            },
+            'rejected' => function (AwsException $reason, $iterKey) {
+                throw $reason;
+            },
+        ]);
+
+        $pool->promise()->wait();
 
         return $downloadInstructions;
     }
