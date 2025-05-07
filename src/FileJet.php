@@ -167,7 +167,7 @@ final class FileJet
 
         $downloadInstructions = [];
         $pool = new CommandPool($this->lambdaClient, $commands, [
-            'concurrency' => 10,
+            'concurrency' => $concurrency,
             'fulfilled' => function (ResultInterface $result, $index) use (&$downloadInstructions, $batchSize, $orderedIdentifiers) {
                 $decodedBulkResponse = json_decode(
                     (string)$result->get('Payload'),
@@ -177,12 +177,7 @@ final class FileJet
                     $key = $batchSize * $index + $key;
                     if (isset($instructionData['url'])) {
                         $downloadInstructions[$orderedIdentifiers[$key]] = new DownloadInstruction($instructionData['url']);
-
-                        continue;
                     }
-
-                    // set empty string as a fallback to prevent errors down the line
-                    $downloadInstructions[$orderedIdentifiers[$key]] = new DownloadInstruction('');
                 }
             },
             'rejected' => function (AwsException $reason, $iterKey) {
@@ -278,17 +273,6 @@ final class FileJet
                 array_merge($body, ['$command' => $operation])
             ]),
         ])->get('Payload');
-    }
-
-    private function requestAsync(string $operation, array $body)
-    {
-        return $this->lambdaClient->invokeAsync([
-            'FunctionName' => $this->config->getLambdaControllerFunctionName(),
-            'Payload' => json_encode([
-                array_merge($body, ['$command' => $operation])
-            ]),
-            'InvocationType' => 'RequestResponse',
-        ]);
     }
 
     private function ensureValidId(string $fileId): string
