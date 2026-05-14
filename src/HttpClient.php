@@ -36,7 +36,7 @@ final class HttpClient
         string $method,
         string $uri,
         array $headers = [],
-        string $body = null
+        ?string $body = null
     ): ResponseInterface {
         $response = $this->client->sendRequest(
             $this->messageFactory->createRequest(

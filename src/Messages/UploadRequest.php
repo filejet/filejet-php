@@ -20,7 +20,7 @@ final class UploadRequest
     /** @var string|null */
     private $filename;
 
-    public function __construct(string $contentType, string $access = self::PUBLIC_ACCESS, int $expires = self::DEFAULT_TTL_IN_SECONDS, string $filename = null)
+    public function __construct(string $contentType, string $access = self::PUBLIC_ACCESS, int $expires = self::DEFAULT_TTL_IN_SECONDS, ?string $filename = null)
     {
         $this->contentType = $contentType;
         $this->access = $access;

@@ -11,7 +11,7 @@ final class File implements FileInterface
     /** @var null|string */
     private $mutation;
 
-    public function __construct(string $identifier, string $mutation = null)
+    public function __construct(string $identifier, ?string $mutation = null)
     {
         $this->identifier = $identifier;
         $this->mutation = $mutation;
