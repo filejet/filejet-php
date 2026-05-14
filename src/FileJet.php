@@ -290,7 +290,7 @@ final class FileJet
     /**
      * @deprecated Please do use the FileJet/Mutation
      */
-    public function toMutation(FileInterface $file, string $mutation = null) : ?string {
+    public function toMutation(FileInterface $file, ?string $mutation = null) : ?string {
         return $this->mutation->toMutation($file, $mutation);
     }
 

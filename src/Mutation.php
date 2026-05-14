@@ -23,7 +23,7 @@ class Mutation
         return $output === '' ? null : $output;
     }
 
-    public function toMutation(FileInterface $file, string $mutation = null) : ?string
+    public function toMutation(FileInterface $file, ?string $mutation = null) : ?string
     {
         $output = $file->getMutation() ?? '';
         $separator = empty($output) || empty($mutation) ? '' : ',';

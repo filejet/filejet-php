@@ -20,11 +20,11 @@ class Config
     public function __construct(
         string $lambdaControllerFunctionName,
         string $customDomain,
-        string $signatureSecret = null,
+        ?string $signatureSecret = null,
         bool $autoMode = true,
-        string $baseUrl = null
+        ?string $baseUrl = null
     ) {
-        $this->lambdaFunctionName = $lambdaControllerFunctionName;
+        $this->lambdaControllerFunctionName = $lambdaControllerFunctionName;
         $this->signatureSecret = $signatureSecret;
         $this->autoMode = $autoMode;
         $this->baseUrl = $baseUrl;
@@ -33,7 +33,7 @@ class Config
 
     public function getLambdaControllerFunctionName(): string
     {
-        return $this->lambdaFunctionName;
+        return $this->lambdaControllerFunctionName;
     }
 
     public function getBaseUrl(): ?string
